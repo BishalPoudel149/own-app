@@ -8,6 +8,7 @@ import {
   doc,
   updateDoc,
   deleteDoc,
+  setDoc,
   query,
   orderBy,
   serverTimestamp
@@ -53,6 +54,7 @@ import {
 import { format, parseISO, startOfMonth, endOfMonth, isWithinInterval } from 'date-fns';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+import logo from './assets/Expense_tracker.svg';
 
 // --- Utility ---
 function cn(...inputs) {
@@ -78,6 +80,11 @@ const googleProvider = new GoogleAuthProvider();
 const APP_ID = import.meta.env.VITE_APP_ID || 'default-app-id';
 
 // --- Constants ---
+const CURRENCIES = [
+  { code: 'USD', symbol: '$', label: '$', decimals: 2 },
+  { code: 'INR', symbol: '₹', label: '₹', decimals: 0 },
+];
+
 const CATEGORIES = [
   { id: 'Food', label: 'Grocery/Food', icon: Utensils, color: '#FF6B6B' },
   { id: 'Clothes', label: 'Clothes', icon: Shirt, color: '#4ECDC4' },
@@ -182,8 +189,8 @@ const Modal = ({ isOpen, onClose, title, children }) => {
 const SignIn = ({ onSignIn }) => (
   <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 p-4">
     <div className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md text-center">
-      <div className="w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center mx-auto mb-6 text-indigo-600">
-        <LogIn size={32} />
+      <div className="w-20 h-20 bg-indigo-50 rounded-full flex items-center justify-center mx-auto mb-6">
+        <img src={logo} alt="Logo" className="w-12 h-12 object-contain" />
       </div>
       <h1 className="text-2xl font-bold text-slate-900 mb-2">Welcome Back</h1>
       <p className="text-slate-500 mb-8">Sign in to keep track of your personal expenses and manage your budget effectively.</p>
@@ -220,6 +227,7 @@ export default function App() {
   const [expenses, setExpenses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState('record'); // 'record' | 'report'
+  const [currency, setCurrency] = useState(CURRENCIES[0]); // Default USD
 
   // Form State
   const [title, setTitle] = useState('');
@@ -234,6 +242,21 @@ export default function App() {
   // Report State
   const [reportMonth, setReportMonth] = useState(format(new Date(), 'yyyy-MM'));
 
+  // --- Helper ---
+  const formatMoney = (amount) => {
+    return `${currency.symbol}${amount.toLocaleString(undefined, {
+      minimumFractionDigits: currency.decimals,
+      maximumFractionDigits: currency.decimals
+    })}`;
+  };
+
+  // Dynamic Currency Icon Component
+  const CurrencyIcon = ({ size = 18, className }) => (
+    <span className={cn("font-semibold flex items-center justify-center", className)} style={{ fontSize: size, width: size, height: size }}>
+      {currency.symbol}
+    </span>
+  );
+
   // --- Auth & Data Sync ---
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (u) => {
@@ -243,24 +266,46 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
+  // Load User Settings
+  useEffect(() => {
+    if (!user) return;
+    const userSettingsRef = doc(db, `artifacts/${APP_ID}/users/${user.uid}/settings`, 'preferences');
+    const unsubscribe = onSnapshot(userSettingsRef, (doc) => {
+      if (doc.exists()) {
+        const data = doc.data();
+        if (data.currency) {
+          const savedCurrency = CURRENCIES.find(c => c.code === data.currency);
+          if (savedCurrency) setCurrency(savedCurrency);
+        }
+      }
+    });
+    return () => unsubscribe();
+  }, [user]);
+
   useEffect(() => {
     if (!user) {
       setExpenses([]);
       return;
     }
 
+    const path = `artifacts/${APP_ID}/users/${user.uid}/expenses`;
+    console.log("Listening to Firestore path:", path);
+
     const q = query(
-      collection(db, `artifacts/${APP_ID}/users/${user.uid}/expenses`),
+      collection(db, path),
       orderBy('date', 'desc'),
       orderBy('createdAt', 'desc')
     );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
+      console.log("Snapshot received. Docs count:", snapshot.docs.length);
       const data = snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
       }));
       setExpenses(data);
+    }, (error) => {
+      console.error("Snapshot error:", error);
     });
 
     return () => unsubscribe();
@@ -284,6 +329,17 @@ export default function App() {
     }
   };
 
+  const handleCurrencyChange = async (e) => {
+    const newCode = e.target.value;
+    const newCurrency = CURRENCIES.find(c => c.code === newCode);
+    setCurrency(newCurrency);
+
+    if (user) {
+      const userSettingsRef = doc(db, `artifacts/${APP_ID}/users/${user.uid}/settings`, 'preferences');
+      await setDoc(userSettingsRef, { currency: newCode }, { merge: true });
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!title || !amount) return;
@@ -297,15 +353,20 @@ export default function App() {
         updatedAt: serverTimestamp(),
       };
 
+      const path = `artifacts/${APP_ID}/users/${user.uid}/expenses`;
+      console.log("Saving to path:", path);
+
       if (editingId) {
-        await updateDoc(doc(db, `artifacts/${APP_ID}/users/${user.uid}/expenses`, editingId), expenseData);
+        await updateDoc(doc(db, path, editingId), expenseData);
         setEditingId(null);
       } else {
-        await addDoc(collection(db, `artifacts/${APP_ID}/users/${user.uid}/expenses`), {
+        await addDoc(collection(db, path), {
           ...expenseData,
           createdAt: serverTimestamp(),
         });
       }
+
+      console.log("Save successful");
 
       // Reset form
       setTitle('');
@@ -314,6 +375,7 @@ export default function App() {
       setDate(format(new Date(), 'yyyy-MM-dd'));
     } catch (error) {
       console.error("Error saving expense:", error);
+      alert(`Error saving: ${error.message}`); // Visible feedback
     }
   };
 
@@ -389,18 +451,32 @@ export default function App() {
         {/* Header */}
         <header className="bg-indigo-600 text-white p-6 pb-12 rounded-b-[2.5rem] shadow-lg relative z-10">
           <div className="flex justify-between items-center mb-6">
-            <h1 className="text-2xl font-bold tracking-tight">Expense<span className="text-indigo-200">Tracker</span></h1>
+            <div className="flex items-center gap-2">
+              <img src={logo} alt="Logo" className="h-8 w-8 object-contain brightness-0 invert" />
+              <h1 className="text-2xl font-bold tracking-tight">Expense<span className="text-indigo-200">Tracker</span></h1>
+            </div>
             <div className="flex items-center gap-3">
-              <div className="h-8 w-8 rounded-full bg-indigo-500/50 flex items-center justify-center overflow-hidden border border-indigo-400/30">
-                {user.photoURL ? (
-                  <img src={user.photoURL} alt={user.displayName} className="h-full w-full object-cover" />
-                ) : (
-                  <span className="text-xs font-medium">{user.displayName ? user.displayName[0] : 'U'}</span>
-                )}
+              {/* Currency Selector */}
+              <select
+                value={currency.code}
+                onChange={handleCurrencyChange}
+                className="bg-indigo-500/50 text-white border border-indigo-400/30 rounded-lg px-2 py-1 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-white/20 cursor-pointer appearance-none text-center min-w-[3rem]"
+              >
+                {CURRENCIES.map(c => (
+                  <option key={c.code} value={c.code} className="text-slate-900">{c.label}</option>
+                ))}
+              </select>
+
+              <div className="h-10 w-10 rounded-full bg-white/10 flex items-center justify-center overflow-hidden border border-white/20 shadow-sm">
+                <img
+                  src={user.photoURL || `https://api.dicebear.com/9.x/avataaars/svg?seed=${user.uid}&backgroundColor=b6e3f4`}
+                  alt={user.displayName || 'User'}
+                  className="h-full w-full object-cover"
+                />
               </div>
               <button
                 onClick={handleSignOut}
-                className="text-indigo-200 hover:text-white transition-colors"
+                className="text-indigo-200 hover:text-white transition-colors p-2 hover:bg-white/10 rounded-full"
                 title="Sign Out"
               >
                 <LogOut size={20} />
@@ -412,7 +488,7 @@ export default function App() {
             <div className="text-center">
               <p className="text-indigo-100 text-sm font-medium mb-1">Total Spent This Month</p>
               <div className="text-4xl font-bold tracking-tight">
-                ${reportData.total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                {formatMoney(reportData.total)}
               </div>
             </div>
           ) : (
@@ -446,10 +522,10 @@ export default function App() {
                   <div className="grid grid-cols-2 gap-3">
                     <Input
                       type="number"
-                      placeholder="0.00"
+                      placeholder="0"
                       value={amount}
                       onChange={e => setAmount(e.target.value)}
-                      icon={DollarSign}
+                      icon={CurrencyIcon} // Use dynamic icon
                       step="0.01"
                       required
                     />
@@ -511,7 +587,7 @@ export default function App() {
                         </div>
                         <div className="flex items-center gap-4">
                           <span className="font-bold text-slate-900">
-                            -${expense.amount.toFixed(2)}
+                            -{formatMoney(expense.amount)}
                           </span>
                           <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity md:opacity-100">
                             <button onClick={() => handleEdit(expense)} className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-full transition-colors">
@@ -570,7 +646,7 @@ export default function App() {
                         ))}
                       </Pie>
                       <Tooltip
-                        formatter={(value) => `$${value.toFixed(2)}`}
+                        formatter={(value) => formatMoney(value)}
                         contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
                       />
                     </PieChart>
@@ -581,7 +657,7 @@ export default function App() {
                     <div key={item.name} className="flex items-center gap-2 text-sm">
                       <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }} />
                       <span className="text-slate-600 truncate">{item.name}</span>
-                      <span className="ml-auto font-medium text-slate-900">${item.value.toFixed(0)}</span>
+                      <span className="ml-auto font-medium text-slate-900">{formatMoney(item.value)}</span>
                     </div>
                   ))}
                 </div>
