@@ -49,7 +49,10 @@ import {
   MoreHorizontal,
   X,
   LogOut,
-  LogIn
+  LogIn,
+  Github,
+  Linkedin,
+  Instagram
 } from 'lucide-react';
 import { format, parseISO, startOfMonth, endOfMonth, isWithinInterval } from 'date-fns';
 import { clsx } from 'clsx';
@@ -445,29 +448,29 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 font-sans pb-20 md:pb-0">
-      <div className="max-w-md mx-auto min-h-screen bg-white shadow-2xl shadow-slate-200/50 overflow-hidden flex flex-col">
+    <div className="min-h-screen bg-slate-50 text-slate-900 font-sans">
+      <div className="max-w-md mx-auto h-screen bg-white shadow-2xl shadow-slate-200/50 overflow-hidden flex flex-col">
 
         {/* Header */}
         <header className="bg-indigo-600 text-white p-6 pb-12 rounded-b-[2.5rem] shadow-lg relative z-10">
           <div className="flex justify-between items-center mb-6">
             <div className="flex items-center gap-2">
-              <img src={logo} alt="Logo" className="h-8 w-8 object-contain brightness-0 invert" />
-              <h1 className="text-2xl font-bold tracking-tight">Expense<span className="text-indigo-200">Tracker</span></h1>
+              <img src={logo} alt="Logo" className="h-8 w-8 object-contain" />
+              <h1 className="text-lg md:text-2xl font-bold tracking-tight">Expense<span className="text-indigo-200">Tracker</span></h1>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 md:gap-3">
               {/* Currency Selector */}
               <select
                 value={currency.code}
                 onChange={handleCurrencyChange}
-                className="bg-indigo-500/50 text-white border border-indigo-400/30 rounded-lg px-2 py-1 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-white/20 cursor-pointer appearance-none text-center min-w-[3rem]"
+                className="bg-indigo-500/50 text-white border border-indigo-400/30 rounded-lg px-1 py-1 text-xs md:text-sm font-medium focus:outline-none focus:ring-2 focus:ring-white/20 cursor-pointer appearance-none text-center min-w-[2.5rem] md:min-w-[3rem]"
               >
                 {CURRENCIES.map(c => (
                   <option key={c.code} value={c.code} className="text-slate-900">{c.label}</option>
                 ))}
               </select>
 
-              <div className="h-10 w-10 rounded-full bg-white/10 flex items-center justify-center overflow-hidden border border-white/20 shadow-sm">
+              <div className="h-8 w-8 md:h-10 md:w-10 rounded-full bg-white/10 flex items-center justify-center overflow-hidden border border-white/20 shadow-sm">
                 <img
                   src={user.photoURL || `https://api.dicebear.com/9.x/avataaars/svg?seed=${user.uid}&backgroundColor=b6e3f4`}
                   alt={user.displayName || 'User'}
@@ -476,10 +479,10 @@ export default function App() {
               </div>
               <button
                 onClick={handleSignOut}
-                className="text-indigo-200 hover:text-white transition-colors p-2 hover:bg-white/10 rounded-full"
+                className="text-indigo-200 hover:text-white transition-colors p-1.5 md:p-2 hover:bg-white/10 rounded-full"
                 title="Sign Out"
               >
-                <LogOut size={20} />
+                <LogOut size={18} className="md:w-5 md:h-5" />
               </button>
             </div>
           </div>
@@ -504,6 +507,7 @@ export default function App() {
           )}
         </header>
 
+        {/* Content */}
         {/* Content */}
         <main className="flex-1 -mt-6 px-4 relative z-20 overflow-y-auto no-scrollbar">
 
@@ -589,11 +593,11 @@ export default function App() {
                           <span className="font-bold text-slate-900">
                             -{formatMoney(expense.amount)}
                           </span>
-                          <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity md:opacity-100">
-                            <button onClick={() => handleEdit(expense)} className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-full transition-colors">
+                          <div className="flex gap-1 text-slate-400">
+                            <button onClick={() => handleEdit(expense)} className="p-1.5 hover:text-indigo-600 hover:bg-indigo-50 rounded-full transition-colors">
                               <Edit2 size={16} />
                             </button>
-                            <button onClick={() => setDeletingId(expense.id)} className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-full transition-colors">
+                            <button onClick={() => setDeletingId(expense.id)} className="p-1.5 hover:text-red-600 hover:bg-red-50 rounded-full transition-colors">
                               <Trash2 size={16} />
                             </button>
                           </div>
@@ -667,7 +671,7 @@ export default function App() {
         </main>
 
         {/* Navigation */}
-        <nav className="bg-white border-t border-slate-100 px-6 py-3 flex justify-around items-center absolute bottom-0 w-full md:relative md:rounded-b-2xl">
+        <nav className="bg-white border-t border-slate-100 px-6 py-3 flex justify-around items-center relative z-30">
           <button
             onClick={() => setView('record')}
             className={cn(
@@ -696,6 +700,40 @@ export default function App() {
             Reports
           </button>
         </nav>
+
+        {/* Footer */}
+        <footer className="py-4 text-center border-t border-slate-100 bg-slate-50 relative z-30">
+          <p className="text-slate-400 text-xs mb-2">Developed by <span className="font-semibold text-slate-600">Bishal Poudel</span></p>
+          <div className="flex justify-center gap-3">
+            <a
+              href="https://github.com/BishalPoudel149"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-slate-400 hover:text-slate-900 transition-colors"
+              title="GitHub"
+            >
+              <Github size={16} />
+            </a>
+            <a
+              href="https://www.linkedin.com/in/bishalpoudel149/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-slate-400 hover:text-[#0077b5] transition-colors"
+              title="LinkedIn"
+            >
+              <Linkedin size={16} />
+            </a>
+            <a
+              href="https://instagram.com/bishalpoudel149"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-slate-400 hover:text-[#E1306C] transition-colors"
+              title="Instagram"
+            >
+              <Instagram size={16} />
+            </a>
+          </div>
+        </footer>
 
         {/* Delete Confirmation Modal */}
         <Modal
